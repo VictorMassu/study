@@ -9,6 +9,8 @@ from simulador import calcular_lucro
 from executor_ordens import enviar_ordem_binance
 from executor_ordens_bybit import enviar_ordem_bybit
 from utils.logger import setup_logger
+from historico import salvar_ordem
+
 
 logger = setup_logger()
 
@@ -36,6 +38,8 @@ def rodar_analise():
                 logger.info(f"📦 Calculando ordem para {par} | Qtd: {quantidade} | Preço compra: {preco_bnb[0]} | Preço venda: {preco_byb[1]}")
                 enviar_ordem_binance(par=par, side="BUY", quantidade=str(quantidade), preco=str(preco_bnb[0]))
                 enviar_ordem_bybit(par=par, side="SELL", quantidade=str(quantidade), preco=str(preco_byb[1]))
+                salvar_ordem(par, "Binance", "BUY", quantidade, preco_bnb[0], lucro)
+                salvar_ordem(par, "Bybit", "SELL", quantidade, preco_byb[1], lucro)
 
         elif preco_byb[0] < preco_bnb[1]:
             logger.info(f"💡 Oportunidade: Comprar na Bybit, vender na Binance")
@@ -45,6 +49,9 @@ def rodar_analise():
                 logger.info(f"📦 Calculando ordem para {par} | Qtd: {quantidade} | Preço compra: {preco_byb[0]} | Preço venda: {preco_bnb[1]}")
                 enviar_ordem_bybit(par=par, side="BUY", quantidade=str(quantidade), preco=str(preco_byb[0]))
                 enviar_ordem_binance(par=par, side="SELL", quantidade=str(quantidade), preco=str(preco_bnb[1]))
+                salvar_ordem(par, "Bybit", "BUY", quantidade, preco_byb[0], lucro)
+                salvar_ordem(par, "Binance", "SELL", quantidade, preco_bnb[1], lucro)
+
         else:
             logger.info(f"❌ Nenhuma arbitragem lucrativa encontrada para {par}")
     logger.info("✅ Ciclo de análise finalizado")
