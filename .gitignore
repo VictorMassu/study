@@ -1,0 +1,6 @@
+# Ignorar credenciais e arquivos sensíveis
+.env
+logs/
+__pycache__/
+*.pyc
+.DS_Store
