@@ -1,5 +1,6 @@
+# main.py
+
 from config import PARES, VALOR_POR_ORDEM_USDT, MODO_SIMULACAO
-import config
 from exchanges.binance import obter_preco_binance, verificar_saldo_binance
 from exchanges.bybit import obter_preco_bybit, verificar_saldo_bybit
 from comparador import comparar_precos
@@ -35,45 +36,36 @@ def rodar_analise():
                 casas_decimais = get_precision_binance(par)
                 quantidade = round(VALOR_POR_ORDEM_USDT / preco_bnb[0], casas_decimais)
                 logger.info(f"Calculando ordem para {par} | Qtd: {quantidade} | Preço compra: {preco_bnb[0]} | Preço venda: {preco_byb[1]}")
-
+                
                 if verificar_saldo_binance(par, "BUY", VALOR_POR_ORDEM_USDT):
                     enviar_ordem_binance(par=par, side="BUY", quantidade=str(quantidade), preco=str(preco_bnb[0]))
+                    if verificar_saldo_bybit(par, "SELL", quantidade):
+                        enviar_ordem_bybit(par=par, side="SELL", quantidade=str(quantidade), preco=str(preco_byb[1]))
+                        salvar_ordem(par, "Binance", "BUY", quantidade, preco_bnb[0], lucro)
+                        salvar_ordem(par, "Bybit", "SELL", quantidade, preco_byb[1], lucro)
+                    else:
+                        logger.warning(f"[BYBIT] Saldo insuficiente para vender {par}")
                 else:
                     logger.warning(f"[BINANCE] Saldo insuficiente para comprar {par}")
-                    continue
-
-                if verificar_saldo_bybit(par, "SELL", quantidade):
-                    enviar_ordem_bybit(par=par, side="SELL", quantidade=str(quantidade), preco=str(preco_byb[1]))
-                else:
-                    logger.warning(f"[BYBIT] Saldo insuficiente para vender {par} na Bybit")
-                    continue
-
-                salvar_ordem(par, "Binance", "BUY", quantidade, preco_bnb[0], lucro)
-                salvar_ordem(par, "Bybit", "SELL", quantidade, preco_byb[1], lucro)
 
         elif preco_byb[0] < preco_bnb[1]:
             logger.info(f"Oportunidade: Comprar na Bybit, vender na Binance")
             lucro = calcular_lucro(par, preco_byb[0], preco_bnb[1])
             if not MODO_SIMULACAO and lucro > 0:
-                preco_compra_byb, _ = obter_preco_bybit(par)
                 casas_decimais = get_precision_binance(par)
-                quantidade = round(VALOR_POR_ORDEM_USDT / preco_compra_byb, casas_decimais)
+                quantidade = round(VALOR_POR_ORDEM_USDT / preco_byb[0], casas_decimais)
                 logger.info(f"Calculando ordem para {par} | Qtd: {quantidade} | Preço compra: {preco_byb[0]} | Preço venda: {preco_bnb[1]}")
-
+                
                 if verificar_saldo_bybit(par, "BUY", VALOR_POR_ORDEM_USDT):
                     enviar_ordem_bybit(par=par, side="BUY", quantidade=str(quantidade), preco=str(preco_byb[0]))
+                    if verificar_saldo_binance(par, "SELL", quantidade):
+                        enviar_ordem_binance(par=par, side="SELL", quantidade=str(quantidade), preco=str(preco_bnb[1]))
+                        salvar_ordem(par, "Bybit", "BUY", quantidade, preco_byb[0], lucro)
+                        salvar_ordem(par, "Binance", "SELL", quantidade, preco_bnb[1], lucro)
+                    else:
+                        logger.warning(f"[BINANCE] Saldo insuficiente para vender {par}")
                 else:
-                    logger.warning(f"[BYBIT] Saldo insuficiente para comprar {par} na Bybit")
-                    continue
-
-                if verificar_saldo_binance(par, "SELL", quantidade):
-                    enviar_ordem_binance(par=par, side="SELL", quantidade=str(quantidade), preco=str(preco_bnb[1]))
-                else:
-                    logger.warning(f"[BINANCE] Saldo insuficiente para vender {par}")
-                    continue
-
-                salvar_ordem(par, "Bybit", "BUY", quantidade, preco_byb[0], lucro)
-                salvar_ordem(par, "Binance", "SELL", quantidade, preco_bnb[1], lucro)
+                    logger.warning(f"[BYBIT] Saldo insuficiente para comprar {par}")
 
         else:
             logger.info(f"Nenhuma arbitragem lucrativa encontrada para {par}")
