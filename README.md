@@ -1,65 +1,39 @@
-# 🤖 Crypto_Beta
+# 🤖 Crypto Arbitrage Bot (Testnet)
 
-Um robô de arbitragem de criptomoedas em Python que simula e executa ordens reais (em testnets) entre Binance e Bybit.
+Este projeto é um robô de arbitragem automatizado entre as exchanges **Binance** e **Bybit**, utilizando as APIs **oficiais de testnet**.
 
-## ⚙️ Funcionalidades
-- Conecta na Binance Testnet e Bybit Testnet
-- Monitora pares BTC/USDT e ETH/USDT
-- Detecta oportunidades de arbitragem com base no spread
-- Calcula lucro líquido considerando taxas de saque e trading
-- Executa ordens LIMIT reais nas testnets se `MODO_SIMULACAO = False`
-- Gera logs detalhados para análise e debug
-
-## 🚀 Como usar
-
-1. Clone o repositório:
-```bash
-git clone https://github.com/seu-usuario/Crypto_Beta.git
-cd Crypto_Beta
-```
-
-2. Instale as dependências:
-```bash
-pip install -r requirements.txt
-```
-
-3. Crie um arquivo `.env` com suas credenciais:
-```env
-# .env
-BINANCE_API_KEY=xxx
-BINANCE_API_SECRET=xxx
-BYBIT_API_KEY=xxx
-BYBIT_API_SECRET=xxx
-```
-
-4. Execute o projeto:
-```bash
-python main.py
-```
-
-## 🧠 Estrutura
-
-```
-Crypto_Beta/
-├── config.py
-├── main.py
-├── comparador.py
-├── simulador.py
-├── taxas.py
-├── executor_ordens.py
-├── executor_ordens_bybit.py
-├── exchanges/
-│   ├── binance.py
-│   └── bybit.py
-├── utils/
-│   └── logger.py
-├── logs/
-│   └── crypto_arbitragem.log
-├── .env.example
-├── .gitignore
-└── README.md
-```
+Ele detecta oportunidades de lucro comprando cripto em uma exchange e vendendo em outra, tudo com execução de **ordens reais (LIMIT)** nas testnets.
 
 ---
 
-**Desenvolvido com ❤️ e inteligência para arbitragem estratégica.**
+## 🚀 Funcionalidades
+
+✅ Consulta de preços ao vivo (Binance e Bybit)  
+✅ Cálculo de spread e lucro real (com taxas)  
+✅ Execução automática de ordens `LIMIT` nas testnets  
+✅ Cálculo automático de quantidade com base em valor disponível (ex: 500 USDT)  
+✅ Precisão dinâmica (casas decimais ajustadas por par)  
+✅ Logs organizados e históricos salvos  
+✅ Módulos organizados e prontos para escalar
+
+---
+
+## ⚙️ Requisitos
+
+- Python 3.9 ou superior  
+- Conta nas testnets da Binance e Bybit  
+- Variáveis `.env` configuradas (veja `.env.example`)  
+- Criação de par `logs/` para armazenar o log do bot
+
+---
+
+## 🛠️ Como usar
+
+```bash
+git clone https://github.com/VictorMassu/study.git
+cd study
+python -m venv .venv
+source .venv/Scripts/activate  # (ou .venv/bin/activate no Linux/mac)
+pip install -r requirements.txt
+cp .env.example .env  # e preencha com suas chaves
+python main.py

@@ -3,7 +3,6 @@
 
 from config import PARES, VALOR_POR_ORDEM_USDT, MODO_SIMULACAO
 import config
-print("DEBUG BYBIT_API_SECRET:", config.BYBIT_API_SECRET)
 from exchanges.binance import obter_preco_binance
 from exchanges.bybit import obter_preco_bybit
 from comparador import comparar_precos
@@ -12,6 +11,8 @@ from executor_ordens import enviar_ordem_binance
 from executor_ordens_bybit import enviar_ordem_bybit
 from utils.logger import setup_logger
 from historico import salvar_ordem
+from utils.binance_utils import get_precision_binance
+
 
 
 logger = setup_logger()
@@ -36,7 +37,8 @@ def rodar_analise():
             logger.info(f"Oportunidade: Comprar na Binance, vender na Bybit")
             lucro = calcular_lucro(par, preco_bnb[0], preco_byb[1])
             if not MODO_SIMULACAO and lucro > 0:
-                quantidade = round(VALOR_POR_ORDEM_USDT / preco_bnb[0], 6)
+                casas_decimais = get_precision_binance(par)
+                quantidade = round(VALOR_POR_ORDEM_USDT / preco_bnb[0], casas_decimais)
                 logger.info(f"Calculando ordem para {par} | Qtd: {quantidade} | Preço compra: {preco_bnb[0]} | Preço venda: {preco_byb[1]}")
                 enviar_ordem_binance(par=par, side="BUY", quantidade=str(quantidade), preco=str(preco_bnb[0]))
                 enviar_ordem_bybit(par=par, side="SELL", quantidade=str(quantidade), preco=str(preco_byb[1]))
@@ -47,7 +49,8 @@ def rodar_analise():
             logger.info(f"Oportunidade: Comprar na Bybit, vender na Binance")
             lucro = calcular_lucro(par, preco_byb[0], preco_bnb[1])
             if not MODO_SIMULACAO and lucro > 0:
-                quantidade = round(VALOR_POR_ORDEM_USDT / preco_byb[0], 6)
+                casas_decimais = get_precision_binance(par)
+                quantidade = round(VALOR_POR_ORDEM_USDT / preco_byb, casas_decimais)
                 logger.info(f"Calculando ordem para {par} | Qtd: {quantidade} | Preço compra: {preco_byb[0]} | Preço venda: {preco_bnb[1]}")
                 enviar_ordem_bybit(par=par, side="BUY", quantidade=str(quantidade), preco=str(preco_byb[0]))
                 enviar_ordem_binance(par=par, side="SELL", quantidade=str(quantidade), preco=str(preco_bnb[1]))
