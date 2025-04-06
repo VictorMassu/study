@@ -27,20 +27,18 @@ def obter_preco_binance(par):
         logger.error(f"Erro ao obter preço da Binance para {par}: {e}")
         return None, None
 
-def verificar_saldo_binance(par, side, quantidade_necessaria):
+def verificar_saldo_binance(moeda):
     try:
-        client = Client(BINANCE_API_KEY, BINANCE_API_SECRET)
-        moeda = "USDT" if side == "BUY" else par.replace("USDT", "")
+        client = Client(BINANCE_API_KEY, BINANCE_API_SECRET, testnet=True)
         conta = client.get_asset_balance(asset=moeda)
 
         if conta and "free" in conta:
             saldo = float(conta["free"])
             logger.info(f"[Binance] Saldo disponível de {moeda}: {saldo}")
-            return saldo >= quantidade_necessaria
+            return saldo
         else:
             logger.warning(f"[Binance] Saldo não encontrado para {moeda}")
-            return False
-
+            return 0.0
     except Exception as e:
         logger.error(f"[Binance] Erro ao verificar saldo: {e}")
-        return False
+        return 0.0

@@ -6,6 +6,7 @@ import hashlib
 from utils.logger import setup_logger
 from config import BYBIT_BASE_URL
 import logging
+from collections import OrderedDict
 
 logger = setup_logger()
 
@@ -36,59 +37,53 @@ def obter_preco_bybit(par):
         logger.error(f"Erro ao obter preço da Bybit para {par}: {e}")
         return None, None
 
-# Gera assinatura para autenticar na API da Bybit
-def gerar_assinatura(query_string):
-    return hmac.new(
-        os.getenv("BYBIT_API_SECRET").encode('utf-8'),
-        query_string.encode('utf-8'),
-        hashlib.sha256
-    ).hexdigest()
+def gerar_assinatura(secret, params, timestamp, api_key, recv_window):
+    """
+    Monta a string a ser assinada conforme especificado na documentação oficial da Bybit API v5.
+    """
+    sorted_params = sorted(params.items())
+    query_string = '&'.join(f"{k}={v}" for k, v in sorted_params)
+    origin_string = f"{timestamp}{api_key}{recv_window}{query_string}"
+    return hmac.new(secret.encode("utf-8"), origin_string.encode("utf-8"), hashlib.sha256).hexdigest()
 
-# Verifica o saldo disponível de um ativo na conta Bybit
-def verificar_saldo_bybit(api_key, api_secret, simbolo):
+def verificar_saldo_bybit(api_key, api_secret, simbolo="USDT"):
+    """
+    Verifica o saldo disponível para um determinado ativo na conta UNIFICADA da Bybit Testnet.
+    Retorna o saldo disponível ou None em caso de erro.
+    """
     try:
-        # Garante que o símbolo é uma string válida (ex: "USDT", "BTC")
-        if not isinstance(simbolo, str):
-            raise ValueError("O parâmetro 'simbolo' deve ser o nome do ativo em formato string, exemplo: 'USDT'.")
+        endpoint = "/v5/account/wallet-balance"
+        url = BYBIT_BASE_URL + endpoint
+        timestamp = str(int(time.time() * 1000))
+        recv_window = "5000"
 
-        url = "https://api-testnet.bybit.com/v5/account/wallet-balance"
-        
-        recv_window = 5000
-        timestamp = int(time.time() * 1000)
-        params = f"accountType=UNIFIED&coin={simbolo}&recvWindow={recv_window}&timestamp={timestamp}"
-
-        signature = hmac.new(
-            bytes(api_secret, "utf-8"),
-            bytes(params, "utf-8"),
-            hashlib.sha256
-        ).hexdigest()
-
-        headers = {
-            "X-BYBIT-API-KEY": api_key,
-            "X-BYBIT-SIGN": signature,
-            "X-BYBIT-RECV-WINDOW": str(recv_window),
-            "X-BYBIT-TIMESTAMP": str(timestamp)
+        params = {
+            "accountType": "UNIFIED",
+            "coin": simbolo,
         }
 
-        response = requests.get(f"{url}?{params}", headers=headers)
+        sign = gerar_assinatura(api_secret, params, timestamp, api_key, recv_window)
+
+        headers = {
+            "X-BAPI-API-KEY": api_key,
+            "X-BAPI-SIGN": sign,
+            "X-BAPI-TIMESTAMP": timestamp,
+            "X-BAPI-RECV-WINDOW": recv_window,
+            "X-BAPI-SIGN-TYPE": "2"
+        }
+
+        response = requests.get(url, headers=headers, params=params)
         response.raise_for_status()
         data = response.json()
 
-        if data["retCode"] == 0:
-            for balance in data["result"]["list"]:
-                if balance["coin"] == simbolo:
-                    saldo = float(balance["free"])
-                    logger.info(f"[Bybit] Saldo disponível para {simbolo}: {saldo}")
-                    return saldo
-            logger.warning(f"[Bybit] Ativo {simbolo} não encontrado na conta.")
-            return 0.0
+        if data.get("retCode") == 0:
+            saldo = float(data["result"]["list"][0]["coin"][0]["walletBalance"])
+            logger.info(f"[Bybit] Saldo disponível de {simbolo}: {saldo}")
+            return saldo
         else:
-            logger.error(f"[Bybit] Erro na API: {data['retCode']} - {data['retMsg']}")
+            logger.error(f"[Bybit] Erro da API: {data}")
             return None
 
-    except requests.exceptions.RequestException as e:
-        logger.error(f"[Bybit] Erro na requisição: {str(e)}")
-        return None
     except Exception as e:
-        logger.error(f"[Bybit] Erro inesperado: {str(e)}")
+        logger.error(f"[Bybit] Erro inesperado: {e}")
         return None
