@@ -9,6 +9,7 @@ import hashlib
 from utils.logger import setup_logger
 from config import BYBIT_BASE_URL
 from collections import OrderedDict
+import logging
 
 
 logger = setup_logger()
@@ -49,46 +50,49 @@ def gerar_assinatura(query_string):
 from collections import OrderedDict
 import urllib.parse
 
-def verificar_saldo_bybit(par, side, quantidade_necessaria):
+def verificar_saldo_bybit(api_key, api_secret, simbolo):
     try:
-        from config import BYBIT_API_KEY, BYBIT_API_SECRET
-        symbol_base = par.replace("USDT", "")
-        moeda = "USDT" if side == "BUY" else symbol_base.upper()
-
-        params = {
-            "accountType": "UNIFIED",
-            "recvWindow": "5000",
-            "timestamp": str(int(time.time() * 1000))
-        }
-
-        query_string = urllib.parse.urlencode(params)
+        # Endpoint da API para obter o saldo da carteira
+        url = "https://api-testnet.bybit.com/v5/account/wallet-balance"
+        
+        # Parâmetros da requisição
+        recv_window = 5000
+        timestamp = int(time.time() * 1000)
+        params = f"accountType=UNIFIED&coin={simbolo}&recvWindow={recv_window}&timestamp={timestamp}"
+        
+        # Assinatura HMAC para autenticação
         signature = hmac.new(
-            BYBIT_API_SECRET.encode('utf-8'),
-            query_string.encode('utf-8'),
+            bytes(api_secret, "utf-8"),
+            bytes(params, "utf-8"),
             hashlib.sha256
         ).hexdigest()
-
+        
         headers = {
-            "X-BYBIT-API-KEY": BYBIT_API_KEY,
+            "X-BYBIT-API-KEY": api_key,
             "X-BYBIT-SIGN": signature,
-            "X-BYBIT-TIMESTAMP": params["timestamp"],
-            "X-BYBIT-RECV-WINDOW": params["recvWindow"],
+            "X-BYBIT-RECV-WINDOW": str(recv_window),
+            "X-BYBIT-TIMESTAMP": str(timestamp)
         }
-
-        url = f"{BYBIT_BASE_URL}/v5/account/wallet-balance?{query_string}"
-        response = requests.get(url, headers=headers)
+        
+        # Faz a requisição GET
+        response = requests.get(f"{url}?{params}", headers=headers)
         response.raise_for_status()
         data = response.json()
+        
+        # Verifica se a resposta contém o saldo do ativo
+        if data["retCode"] == 0:
+            for balance in data["result"]["list"]:
+                if balance["coin"] == simbolo:
+                    return float(balance["free"])
+            logging.warning(f"[Bybit] Ativo {simbolo} não encontrado na conta.")
+            return 0.0
+        else:
+            logging.error(f"[Bybit] Erro na API: {data['retCode']} - {data['retMsg']}")
+            return None
 
-        for item in data['result']['list'][0]['coin']:
-            if item['coin'] == moeda:
-                saldo = float(item['availableToWithdraw'])
-                logger.info(f"[Bybit] Saldo disponível de {moeda}: {saldo}")
-                return saldo >= quantidade_necessaria
-
-        logger.warning(f"[Bybit] Moeda {moeda} não encontrada no saldo.")
-        return False
-
+    except requests.exceptions.RequestException as e:
+        logging.error(f"[Bybit] Erro na requisição: {str(e)}")
+        return None
     except Exception as e:
-        logger.error(f"[Bybit] Erro ao verificar saldo: {e}")
-        return False
+        logging.error(f"[Bybit] Erro inesperado: {str(e)}")
+        return None

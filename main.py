@@ -10,6 +10,8 @@ from executor_ordens_bybit import enviar_ordem_bybit
 from utils.logger import setup_logger
 from historico import salvar_ordem
 from utils.binance_utils import get_precision_binance
+from config import MARGEM_LUCRO_MINIMA_PORCENTO
+
 
 logger = setup_logger()
 
@@ -32,6 +34,9 @@ def rodar_analise():
         if preco_bnb[0] < preco_byb[1]:
             logger.info(f"Oportunidade: Comprar na Binance, vender na Bybit")
             lucro = calcular_lucro(par, preco_bnb[0], preco_byb[1])
+
+            lucro_minimo_usdt = VALOR_POR_ORDEM_USDT * (MARGEM_LUCRO_MINIMA_PORCENTO / 100)
+
             if not MODO_SIMULACAO and lucro > 0:
                 casas_decimais = get_precision_binance(par)
                 quantidade = round(VALOR_POR_ORDEM_USDT / preco_bnb[0], casas_decimais)
@@ -59,6 +64,9 @@ def rodar_analise():
         elif preco_byb[0] < preco_bnb[1]:
             logger.info(f"Oportunidade: Comprar na Bybit, vender na Binance")
             lucro = calcular_lucro(par, preco_byb[0], preco_bnb[1])
+
+            lucro_minimo_usdt = VALOR_POR_ORDEM_USDT * (MARGEM_LUCRO_MINIMA_PORCENTO / 100)
+
             if not MODO_SIMULACAO and lucro > 0:
                 casas_decimais = get_precision_binance(par)
                 quantidade = round(VALOR_POR_ORDEM_USDT / preco_byb[0], casas_decimais)
