@@ -38,11 +38,19 @@ def rodar_analise():
                 logger.info(f"Calculando ordem para {par} | Qtd: {quantidade} | Preço compra: {preco_bnb[0]} | Preço venda: {preco_byb[1]}")
                 
                 if verificar_saldo_binance(par, "BUY", VALOR_POR_ORDEM_USDT):
-                    enviar_ordem_binance(par=par, side="BUY", quantidade=str(quantidade), preco=str(preco_bnb[0]))
+                    try:
+                        enviar_ordem_binance(par=par, side="BUY", quantidade=str(quantidade), preco=str(preco_bnb[0]))
+                    except Exception as e:
+                        logger.error(f"[BINANCE] Falha ao enviar ordem de compra: {e}")
+                        continue
+
                     if verificar_saldo_bybit(par, "SELL", quantidade):
-                        enviar_ordem_bybit(par=par, side="SELL", quantidade=str(quantidade), preco=str(preco_byb[1]))
-                        salvar_ordem(par, "Binance", "BUY", quantidade, preco_bnb[0], lucro)
-                        salvar_ordem(par, "Bybit", "SELL", quantidade, preco_byb[1], lucro)
+                        try:
+                            enviar_ordem_bybit(par=par, side="SELL", quantidade=str(quantidade), preco=str(preco_byb[1]))
+                            salvar_ordem(par, "Binance", "BUY", quantidade, preco_bnb[0], lucro)
+                            salvar_ordem(par, "Bybit", "SELL", quantidade, preco_byb[1], lucro)
+                        except Exception as e:
+                            logger.error(f"[BYBIT] Falha ao enviar ordem de venda: {e}")
                     else:
                         logger.warning(f"[BYBIT] Saldo insuficiente para vender {par}")
                 else:
@@ -55,13 +63,21 @@ def rodar_analise():
                 casas_decimais = get_precision_binance(par)
                 quantidade = round(VALOR_POR_ORDEM_USDT / preco_byb[0], casas_decimais)
                 logger.info(f"Calculando ordem para {par} | Qtd: {quantidade} | Preço compra: {preco_byb[0]} | Preço venda: {preco_bnb[1]}")
-                
+
                 if verificar_saldo_bybit(par, "BUY", VALOR_POR_ORDEM_USDT):
-                    enviar_ordem_bybit(par=par, side="BUY", quantidade=str(quantidade), preco=str(preco_byb[0]))
+                    try:
+                        enviar_ordem_bybit(par=par, side="BUY", quantidade=str(quantidade), preco=str(preco_byb[0]))
+                    except Exception as e:
+                        logger.error(f"[BYBIT] Falha ao enviar ordem de compra: {e}")
+                        continue
+
                     if verificar_saldo_binance(par, "SELL", quantidade):
-                        enviar_ordem_binance(par=par, side="SELL", quantidade=str(quantidade), preco=str(preco_bnb[1]))
-                        salvar_ordem(par, "Bybit", "BUY", quantidade, preco_byb[0], lucro)
-                        salvar_ordem(par, "Binance", "SELL", quantidade, preco_bnb[1], lucro)
+                        try:
+                            enviar_ordem_binance(par=par, side="SELL", quantidade=str(quantidade), preco=str(preco_bnb[1]))
+                            salvar_ordem(par, "Bybit", "BUY", quantidade, preco_byb[0], lucro)
+                            salvar_ordem(par, "Binance", "SELL", quantidade, preco_bnb[1], lucro)
+                        except Exception as e:
+                            logger.error(f"[BINANCE] Falha ao enviar ordem de venda: {e}")
                     else:
                         logger.warning(f"[BINANCE] Saldo insuficiente para vender {par}")
                 else:
