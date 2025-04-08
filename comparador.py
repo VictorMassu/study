@@ -1,37 +1,42 @@
-from exchanges import binance, bybit
+from exchanges.registry import EXCHANGES
 from utils.taxas import obter_taxas
 from utils.lucro import calcular_lucro_real
+import logging
 
+logger = logging.getLogger(__name__)
 
-# Exemplo de função comparadora entre duas exchanges
 def comparar_e_decidir(par_moeda, quantidade):
-    exchanges = {
-        "binance": {
-            "obter_preco": binance.obter_preco_binance
-        },
-        "bybit": {
-            "obter_preco": bybit.obter_preco_bybit
-        }
-    }
+    """
+    Compara todas as possíveis rotas de arbitragem entre exchanges disponíveis no registro,
+    calcula o lucro real com taxas e decide se alguma rota deve ser executada.
+    """
     melhores_opcao = {
         "lucro_percentual": -float('inf'),
         "origem": None,
         "destino": None,
         "lucro_usdt": 0,
         "preco_compra": 0,
-        "preco_venda": 0
+        "preco_venda": 0,
+        "executar": False
     }
 
-    # Comparar todos os caminhos de arbitragem possíveis entre as exchanges
-    for origem_nome, origem_api in exchanges.items():
-        for destino_nome, destino_api in exchanges.items():
-            if origem_nome == destino_nome:
+    exchanges = list(EXCHANGES.keys())
+
+    for origem in exchanges:
+        for destino in exchanges:
+            if origem == destino:
+                continue  # evita auto-arbitragem
+
+            logger.info(f"\n[Comparação] {origem} -> {destino} para {par_moeda}")
+
+            preco_compra, _ = EXCHANGES[origem].obter_preco(par_moeda)
+            _, preco_venda = EXCHANGES[destino].obter_preco(par_moeda)
+
+            if preco_compra is None or preco_venda is None:
+                logger.warning(f"Preços inválidos para rota {origem} -> {destino}")
                 continue
 
-            preco_compra = exchanges[origem_nome]["obter_preco"](par_moeda)[0]
-            preco_venda = exchanges[destino_nome]["obter_preco"](par_moeda)[1]
-
-            taxas = obter_taxas(par_moeda, origem=origem_nome, destino=destino_nome)
+            taxas = obter_taxas(par_moeda, origem, destino)
 
             resultado = calcular_lucro_real(
                 preco_compra=preco_compra,
@@ -43,19 +48,21 @@ def comparar_e_decidir(par_moeda, quantidade):
                 custo_rede_usdt=taxas['custo_rede']
             )
 
+            logger.info(f"[Lucro] {origem} -> {destino} | Lucro: {resultado['lucro_usdt']} USDT ({resultado['lucro_percentual']}%)")
+
             if resultado['lucro_percentual'] > melhores_opcao['lucro_percentual']:
                 melhores_opcao.update({
                     "lucro_percentual": resultado['lucro_percentual'],
                     "lucro_usdt": resultado['lucro_usdt'],
-                    "origem": origem_nome,
-                    "destino": destino_nome,
+                    "origem": origem,
+                    "destino": destino,
                     "preco_compra": preco_compra,
                     "preco_venda": preco_venda,
                     "executar": resultado['executar']
                 })
 
     if melhores_opcao['executar']:
-        print(f"🚀 Executar arbitragem de {melhores_opcao['origem']} para {melhores_opcao['destino']}! Lucro: {melhores_opcao['lucro_percentual']}% ({melhores_opcao['lucro_usdt']} USDT)")
-        # Aqui você pode chamar a execução real
+        logger.info(f"🚀 Executar arbitragem de {melhores_opcao['origem']} para {melhores_opcao['destino']}! Lucro: {melhores_opcao['lucro_percentual']}% ({melhores_opcao['lucro_usdt']} USDT)")
+        # Aqui você pode integrar a execução real da arbitragem
     else:
-        print(f"⛔ Nenhuma oportunidade de arbitragem viável encontrada. Melhor lucro: {melhores_opcao['lucro_percentual']}%")
+        logger.info(f"⛔ Nenhuma rota vantajosa encontrada para {par_moeda}. Melhor lucro: {melhores_opcao['lucro_percentual']}%")

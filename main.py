@@ -1,47 +1,124 @@
-from config import PARES, VALOR_POR_ORDEM_USDT, MODO_SIMULACAO, MARGEM_LUCRO_MINIMA_PORCENTO
-from exchanges.binance import obter_preco_binance, verificar_saldo_binance
-from exchanges.bybit import obter_preco_bybit, verificar_saldo_bybit as saldo_bybit
+# main.py
+
+from config import PARES, VALOR_POR_ORDEM_USDC, MODO_SIMULACAO, MARGEM_LUCRO_MINIMA_PORCENTO
+from exchanges.registry import EXCHANGES
 from comparador import comparar_e_decidir
 from simulador import calcular_lucro
-from executor_ordens import enviar_ordem_binance
-from executor_ordens_bybit import enviar_ordem_bybit
 from utils.logger import setup_logger
 from historico import salvar_ordem
-from utils.binance_utils import get_precision_binance
-from config import BYBIT_API_KEY, BYBIT_API_SECRET
 
 logger = setup_logger()
 
 def rodar_analise():
     logger.info("Iniciando ciclo de análise de arbitragem")
+
     for par in PARES:
         logger.info(f"\n--- 🔍 Analisando par: {par} ---")
-        preco_bnb = obter_preco_binance(par)
-        preco_byb = obter_preco_bybit(par)
 
-        if preco_bnb == (None, None) or preco_byb == (None, None):
+        preco_binance = EXCHANGES["binance"].obter_preco(par)
+        preco_bybit = EXCHANGES["bybit"].obter_preco(par)
+
+        if preco_binance == (None, None) or preco_bybit == (None, None):
             logger.warning(f"Preços inválidos para {par}, pulando análise.")
             continue
 
-        logger.info(f"Binance - {par}: Compra {preco_bnb[0]}, Venda {preco_bnb[1]}")
-        logger.info(f"Bybit   - {par}: Compra {preco_byb[0]}, Venda {preco_byb[1]}")
+        logger.info(f"Binance - {par}: Compra {preco_binance[0]}, Venda {preco_binance[1]}")
+        logger.info(f"Bybit   - {par}: Compra {preco_bybit[0]}, Venda {preco_bybit[1]}")
 
-        quantidade = round(VALOR_POR_ORDEM_USDT / preco_bnb[0], 6)
-        comparar_e_decidir(par, quantidade)
-
-        # Simula as duas rotas dinamicamente
         rotas = [
-            {"origem": "binance", "destino": "bybit", "preco_compra": preco_bnb[0], "preco_venda": preco_byb[1]},
-            {"origem": "bybit", "destino": "binance", "preco_compra": preco_byb[0], "preco_venda": preco_bnb[1]},
+            {"origem": "binance", "destino": "bybit", "preco_compra": preco_binance[0], "preco_venda": preco_bybit[1]},
+            {"origem": "bybit", "destino": "binance", "preco_compra": preco_bybit[0], "preco_venda": preco_binance[1]},
         ]
 
+        melhor_lucro = float("-inf")
+        melhor_rota = None
+
         for rota in rotas:
-            quantidade = round(VALOR_POR_ORDEM_USDT / rota["preco_compra"], 6)
+            logger.info(f"\n[Análise de Rota] {rota['origem']} -> {rota['destino']} ({par})")
+
+            quantidade = round(VALOR_POR_ORDEM_USDC / rota["preco_compra"], 6)
+            logger.info(f"Qtd estimada para arbitragem: {quantidade} {par.replace('USDT', '')}")
+
             lucro = calcular_lucro(par, rota["preco_compra"], rota["preco_venda"], quantidade, rota["origem"], rota["destino"])
 
-            if not MODO_SIMULACAO and lucro > 0:
-                logger.info(f"[Execução] Comprar na {rota['origem']} e vender na {rota['destino']} | {par} | Qtd: {quantidade}")
-                # Aqui entraria a lógica de envio de ordem real com base na rota escolhida
+            salvar_ordem(
+                par=par,
+                exchange=rota["origem"],
+                tipo_ordem="SIMULACAO",
+                quantidade=quantidade,
+                preco=rota["preco_compra"],
+                lucro_esperado=lucro,
+                simulado=True,
+                origem=rota["origem"],
+                destino=rota["destino"]
+            )
+
+            if lucro > melhor_lucro:
+                melhor_lucro = lucro
+                melhor_rota = rota.copy()
+                melhor_rota["lucro"] = lucro
+                melhor_rota["quantidade"] = quantidade
+
+        if melhor_lucro >= (VALOR_POR_ORDEM_USDC * (MARGEM_LUCRO_MINIMA_PORCENTO / 100)):
+            logger.info(f"🚀 Executando arbitragem: {melhor_rota['origem']} -> {melhor_rota['destino']} com lucro: {melhor_rota['lucro']:.4f} USDT")
+
+            if not MODO_SIMULACAO:
+                origem_exchange = EXCHANGES[melhor_rota["origem"]]
+                destino_exchange = EXCHANGES[melhor_rota["destino"]]
+
+                saldo_origem = origem_exchange.verificar_saldo("USDT")
+
+                if saldo_origem >= VALOR_POR_ORDEM_USDC:
+                    # Enviar ordem de compra
+                    compra = origem_exchange.enviar_ordem(
+                        par=par,
+                        side="BUY",
+                        quantidade=melhor_rota["quantidade"],
+                        preco=melhor_rota["preco_compra"]
+                    )
+
+                    if compra:
+                        salvar_ordem(
+                            par=par,
+                            exchange=melhor_rota["origem"],
+                            tipo_ordem="BUY",
+                            quantidade=melhor_rota["quantidade"],
+                            preco=melhor_rota["preco_compra"],
+                            lucro_esperado=melhor_rota["lucro"],
+                            simulado=False,
+                            origem=melhor_rota["origem"],
+                            destino=melhor_rota["destino"]
+                        )
+
+                        # Enviar ordem de venda
+                        venda = destino_exchange.enviar_ordem(
+                            par=par,
+                            side="SELL",
+                            quantidade=melhor_rota["quantidade"],
+                            preco=melhor_rota["preco_venda"]
+                        )
+
+                        if venda:
+                            salvar_ordem(
+                                par=par,
+                                exchange=melhor_rota["destino"],
+                                tipo_ordem="SELL",
+                                quantidade=melhor_rota["quantidade"],
+                                preco=melhor_rota["preco_venda"],
+                                lucro_esperado=melhor_rota["lucro"],
+                                simulado=False,
+                                origem=melhor_rota["origem"],
+                                destino=melhor_rota["destino"]
+                            )
+                        else:
+                            logger.warning("[ARBITRAGEM] Ordem de venda falhou.")
+                    else:
+                        logger.warning("[ARBITRAGEM] Ordem de compra falhou.")
+                else:
+                    logger.warning("[ARBITRAGEM] Saldo insuficiente para realizar arbitragem.")
+        else:
+            porcentagem = (melhor_lucro / VALOR_POR_ORDEM_USDC) * 100
+            logger.info(f"⛔ Nenhuma oportunidade de arbitragem viável encontrada. Melhor lucro: {porcentagem:.4f}%")
 
     logger.info("Ciclo de análise finalizado")
 
