@@ -1,16 +1,21 @@
-
 # simulador.py
-
 from utils.logger import setup_logger
-from taxas import obter_taxas_simuladas
+from utils.taxas import obter_taxas
+from config import MARGEM_LUCRO_MINIMA_PORCENTO
 
 logger = setup_logger()
 
-def calcular_lucro(par, preco_compra, preco_venda):
-    taxas = obter_taxas_simuladas()
-    taxa_total = preco_compra * taxas['taxa_binance'] + preco_venda * taxas['taxa_bybit'] + taxas['taxa_saque']
-    lucro_bruto = preco_venda - preco_compra
-    lucro_liquido = lucro_bruto - taxa_total
+def calcular_lucro(par, preco_compra, preco_venda, quantidade, origem, destino):
+    taxas = obter_taxas(par, origem=origem, destino=destino)
+    custo_total = preco_compra * quantidade
+    custo_total += custo_total * (taxas['trading_origem'] / 100)
+    custo_total += taxas['saque'] + taxas['custo_rede']
 
-    logger.info(f"[Simulação] {par} - Lucro Bruto: {lucro_bruto:.2f}, Taxas: {taxa_total:.2f}, Lucro Líquido: {lucro_liquido:.2f}")
-    return lucro_liquido
+    valor_venda = preco_venda * quantidade
+    valor_venda -= valor_venda * (taxas['trading_destino'] / 100)
+
+    lucro = valor_venda - custo_total
+    lucro_percentual = (lucro / custo_total) * 100 if custo_total > 0 else 0
+
+    logger.info(f"[Simulação] {par} | {origem} -> {destino} | Lucro: {lucro:.4f} USDT ({lucro_percentual:.4f}%)")
+    return lucro

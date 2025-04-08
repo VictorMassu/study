@@ -29,7 +29,7 @@ def obter_preco_binance(par):
 
 def verificar_saldo_binance(moeda):
     try:
-        client = Client(BINANCE_API_KEY, BINANCE_API_SECRET, testnet=True)
+        client = Client(BINANCE_API_KEY, BINANCE_API_SECRET, testnet=False)
         conta = client.get_asset_balance(asset=moeda)
 
         if conta and "free" in conta:

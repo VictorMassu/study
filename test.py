@@ -1,54 +1,29 @@
 import time
-import hashlib
 import hmac
-import requests
-from config import BYBIT_API_KEY, BYBIT_API_SECRET, BYBIT_BASE_URL
+import hashlib
+import json
 
-def gerar_assinatura(secret, payload):
-    return hmac.new(
-        bytes(secret, "utf-8"),
-        bytes(payload, "utf-8"),
-        hashlib.sha256
-    ).hexdigest()
+api_key = 'kIjSNmSvLsMkqjFo0m'
+api_secret = 'WnjGSXmPen1jXbPwk7MHcUs3jffsTRuFpIhr'
+timestamp = str(int(time.time() * 1000))
+recv_window = '5000'
 
-def obter_saldo_bybit(coin="USDT"):
-    try:
-        endpoint = "/v5/account/wallet-balance"
-        url = BYBIT_BASE_URL + endpoint
+body = {
+    "coin": "USDC",
+    "chain": "POLYGON",
+    "address": "0x789aca852cf967f06caff82448427dad8ab94a7b",
+    "amount": "5",
+    "timestamp": timestamp,
+    "forceChain": 0,
+    "accountType": "FUND"
+}
 
-        timestamp = str(int(time.time() * 1000))
-        recv_window = "5000"
-        query_string = f"accountType=UNIFIED&coin={coin}"
-        payload = timestamp + BYBIT_API_KEY + recv_window + query_string
+# SERIALIZAÇÃO CORRETA (ordenada e sem espaços)
+body_json = json.dumps(body, separators=(',', ':'), sort_keys=True)
 
-        signature = gerar_assinatura(BYBIT_API_SECRET, payload)
+payload = timestamp + api_key + recv_window + body_json
+signature = hmac.new(api_secret.encode(), payload.encode(), hashlib.sha256).hexdigest()
 
-        headers = {
-            "X-BAPI-API-KEY": BYBIT_API_KEY,
-            "X-BAPI-SIGN": signature,
-            "X-BAPI-TIMESTAMP": timestamp,
-            "X-BAPI-RECV-WINDOW": recv_window
-        }
-
-        params = {
-            "accountType": "UNIFIED",
-            "coin": coin
-        }
-
-        response = requests.get(url, headers=headers, params=params)
-        print("🛰️ Response status:", response.status_code)
-        print("🧾 Raw response:", response.text)
-        response.raise_for_status()
-
-        data = response.json()
-        if data.get("retCode") == 0:
-            saldo = data["result"]["list"][0]["coin"][0]["walletBalance"]
-            print(f"✅ Saldo de {coin} na Bybit Testnet: {saldo}")
-        else:
-            print(f"❌ Erro da API: {data}")
-
-    except Exception as e:
-        print(f"❌ Erro inesperado: {e}")
-
-if __name__ == "__main__":
-    obter_saldo_bybit("USDT")
+print("🧪 Corpo serializado:", body_json)
+print("🧪 Payload final:", payload)
+print("🧪 Assinatura HMAC:", signature)
