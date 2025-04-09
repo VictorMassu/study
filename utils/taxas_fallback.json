@@ -1,0 +1,32 @@
+{
+    "binance": {
+        "trading_fee": 0.1,
+        "saques": {
+            "BTC": 0.0005,
+            "ETH": 0.005,
+            "USDC": 0.3,
+            "SOL": 0.01,
+            "ADA": 1.0,
+            "XRP": 0.25,
+            "AVAX": 0.01
+        }
+    },
+    "bybit": {
+        "trading_fee": 0.1,
+        "saques": {
+            "BTC": 0.0005,
+            "ETH": 0.005,
+            "USDC": 0.3,
+            "SOL": 0.01,
+            "ADA": 1.0,
+            "XRP": 0.25,
+            "AVAX": 0.01
+        }
+    },
+    "custo_rede": {
+        "default": 0.2,
+        "polygon": 0.1,
+        "bsc": 0.2,
+        "eth": 2.0
+    }
+}

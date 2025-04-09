@@ -16,39 +16,10 @@ class BybitExchange(ExchangeBase):
         self.api_secret = BYBIT_API_SECRET
         self.base_url = BYBIT_BASE_URL  # Usando a URL dinâmica
 
-    def obter_pares_validos(self):
-        """
-        Consulta os pares válidos na Bybit para verificar se o par está disponível.
-        """
-        try:
-            url = f"{self.base_url}/v2/public/symbols"  # Endpoint de pares válidos
-            response = requests.get(url)
-            response.raise_for_status()
-            data = response.json()
-
-            if data['retCode'] == 0:
-                pares_validos = {item['symbol'] for item in data['result']}
-                logger.info(f"Parâmetros válidos na Bybit: {pares_validos}")
-                return pares_validos
-            else:
-                logger.error("Erro ao obter pares válidos na Bybit.")
-                return set()
-        except Exception as e:
-            logger.error(f"[Bybit] Erro ao obter pares válidos: {e}")
-            return set()
 
     def obter_preco(self, par):
-        """
-        Obtém o preço de compra e venda para um par válido na Bybit.
-        """
-        pares_validos = self.obter_pares_validos()
-        
-        if par not in pares_validos:
-            logger.warning(f"Par {par} não é válido na Bybit. Pulando análise.")
-            return None, None
-
         try:
-            url = f"{self.base_url}/v5/market/tickers?category=linear&symbol={par}"
+            url = f"{self.base_url}/v5/market/tickers?category=spot&symbol={par}"
             response = requests.get(url)
             response.raise_for_status()
             data = response.json()
@@ -65,6 +36,40 @@ class BybitExchange(ExchangeBase):
         except Exception as e:
             logger.error(f"[Bybit] Erro ao obter preço para {par}: {e}")
             return None, None
+        
+    def verificar_saldo(self, moeda):
+        try:
+            timestamp = str(int(time.time() * 1000))
+            payload = f"{timestamp}{self.api_key}5000"
+
+            assinatura = hmac.new(
+                self.api_secret.encode('utf-8'),
+                payload.encode('utf-8'),
+                hashlib.sha256
+            ).hexdigest()
+
+            headers = {
+                "X-BAPI-API-KEY": self.api_key,
+                "X-BAPI-SIGN": assinatura,
+                "X-BAPI-TIMESTAMP": timestamp,
+                "X-BAPI-RECV-WINDOW": "5000",
+                "X-BAPI-SIGN-TYPE": "2"
+            }
+
+            url = f"{self.base_url}/v5/account/wallet-balance?accountType=UNIFIED"
+            response = requests.get(url, headers=headers)
+            data = response.json()
+
+            if data.get("retCode") == 0:
+                saldo = next((float(m["availableBalance"]) for m in data["result"]["list"] if m["coin"] == moeda), 0.0)
+                logger.info(f"[Bybit] Saldo de {moeda}: {saldo}")
+                return saldo
+            else:
+                logger.error(f"[Bybit] Erro ao verificar saldo: {data}")
+                return 0.0
+        except Exception as e:
+            logger.error(f"[Bybit] Erro inesperado ao verificar saldo de {moeda}: {e}")
+            return 0.0
 
         
     def enviar_ordem(self, par, side, quantidade, preco):

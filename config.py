@@ -10,7 +10,7 @@ if AMBIENTE == "test":
     BINANCE_API_SECRET = os.getenv("BINANCE_TEST_API_SECRET")
     BYBIT_API_KEY = os.getenv("BYBIT_TEST_API_KEY")
     BYBIT_API_SECRET = os.getenv("BYBIT_TEST_API_SECRET")
-    BINANCE_BASE_URL = "https://testnet.binance.vision/api"
+    BINANCE_BASE_URL = "https://testnet.binance.vision/"
     BYBIT_BASE_URL = "https://api-testnet.bybit.com"
     MODO_SIMULACAO = True
 else:
@@ -18,11 +18,11 @@ else:
     BINANCE_API_SECRET = os.getenv("BINANCE_PROD_API_SECRET")
     BYBIT_API_KEY = os.getenv("BYBIT_PROD_API_KEY")
     BYBIT_API_SECRET = os.getenv("BYBIT_PROD_API_SECRET")
-    BINANCE_BASE_URL = "https://api.binance.com/api"
+    BINANCE_BASE_URL = "https://api.binance.com/"
     BYBIT_BASE_URL = "https://api.bybit.com"
     MODO_SIMULACAO = False
 
 # Parâmetros gerais
-PARES = ["BTCEUR", "ETHEUR", "BTCUSDC", "ETHUSDC"]
+PARES = ["BTCEUR", "ETHEUR", "BTCUSDC", "ETHUSDC","SOLUSDC","ADAUSDC","XRPUSDC","AVAXUSDC"]
 VALOR_POR_ORDEM_USDC = 500.00
 MARGEM_LUCRO_MINIMA_PORCENTO = 3.0
