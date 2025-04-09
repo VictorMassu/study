@@ -1,5 +1,11 @@
 # exchanges/liquidez.py
 
+
+from utils.logger import setup_logger
+
+# Inicializa o logger
+logger = setup_logger()
+
 # Banco de liquidez global para monitorar o saldo de USDC e outras criptos nas exchanges
 LIQUIDEZ = {
     "binance": {
