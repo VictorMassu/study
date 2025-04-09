@@ -4,39 +4,54 @@ import time
 import hmac
 import hashlib
 import requests
+import json
 from config import BYBIT_API_KEY, BYBIT_API_SECRET, BYBIT_BASE_URL
 from utils.logger import setup_logger
 from exchanges.base import ExchangeBase
 
 logger = setup_logger()
 
+
+def safe_request(method, url, headers=None, params=None, data=None):
+    try:
+        if method == "GET":
+            response = requests.get(url, headers=headers, params=params, timeout=10)
+        elif method == "POST":
+            response = requests.post(url, headers=headers, data=data, timeout=10)
+        else:
+            raise ValueError("Método HTTP não suportado")
+
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        logger.error(f"[Bybit] Erro na requisição HTTP: {e}")
+        return None
+    except Exception as e:
+        logger.error(f"[Bybit] Erro inesperado: {e}")
+        return None
+
+
 class BybitExchange(ExchangeBase):
     def __init__(self):
         self.api_key = BYBIT_API_KEY
         self.api_secret = BYBIT_API_SECRET
-        self.base_url = BYBIT_BASE_URL  # Usando a URL dinâmica
-
+        self.base_url = BYBIT_BASE_URL
 
     def obter_preco(self, par):
-        try:
-            url = f"{self.base_url}/v5/market/tickers?category=spot&symbol={par}"
-            response = requests.get(url)
-            response.raise_for_status()
-            data = response.json()
+        url = f"{self.base_url}/v5/market/tickers"
+        params = {"category": "spot", "symbol": par}
+        data = safe_request("GET", url, params=params)
 
-            if data['retCode'] != 0:
-                logger.warning(f"Erro ao obter dados para {par}: {data['retMsg']}")
-                return None, None
-
-            resultado = data['result']['list'][0]
-            preco_compra = float(resultado['bid1Price'])
-            preco_venda = float(resultado['ask1Price'])
-            logger.info(f"[Bybit] {par} - Compra: {preco_compra}, Venda: {preco_venda}")
-            return preco_compra, preco_venda
-        except Exception as e:
-            logger.error(f"[Bybit] Erro ao obter preço para {par}: {e}")
+        if not data or data.get('retCode') != 0:
+            logger.warning(f"[Bybit] Erro ao obter preço para {par}: {data.get('retMsg', 'Erro desconhecido')}")
             return None, None
-        
+
+        resultado = data['result']['list'][0]
+        preco_compra = float(resultado['bid1Price'])
+        preco_venda = float(resultado['ask1Price'])
+        logger.info(f"[Bybit] {par} - Compra: {preco_compra}, Venda: {preco_venda}")
+        return preco_compra, preco_venda
+
     def verificar_saldo(self, moeda):
         try:
             timestamp = str(int(time.time() * 1000))
@@ -56,11 +71,11 @@ class BybitExchange(ExchangeBase):
                 "X-BAPI-SIGN-TYPE": "2"
             }
 
-            url = f"{self.base_url}/v5/account/wallet-balance?accountType=UNIFIED"
-            response = requests.get(url, headers=headers)
-            data = response.json()
+            url = f"{self.base_url}/v5/account/wallet-balance"
+            params = {"accountType": "UNIFIED"}
+            data = safe_request("GET", url, headers=headers, params=params)
 
-            if data.get("retCode") == 0:
+            if data and data.get("retCode") == 0:
                 saldo = next((float(m["availableBalance"]) for m in data["result"]["list"] if m["coin"] == moeda), 0.0)
                 logger.info(f"[Bybit] Saldo de {moeda}: {saldo}")
                 return saldo
@@ -71,11 +86,7 @@ class BybitExchange(ExchangeBase):
             logger.error(f"[Bybit] Erro inesperado ao verificar saldo de {moeda}: {e}")
             return 0.0
 
-        
     def enviar_ordem(self, par, side, quantidade, preco):
-        """
-        Envia uma ordem LIMIT para a Bybit via API v5.
-        """
         try:
             timestamp = str(int(time.time() * 1000))
             body = {
@@ -108,10 +119,9 @@ class BybitExchange(ExchangeBase):
             url = f"{self.base_url}/v5/order/create"
 
             logger.info(f"[Bybit] Enviando ordem {side} | {par} | Qtd: {quantidade} | Preço: {preco}")
-            response = requests.post(url, headers=headers, data=body_str)
-            resposta = response.json()
+            resposta = safe_request("POST", url, headers=headers, data=body_str)
 
-            if resposta.get("retCode") == 0:
+            if resposta and resposta.get("retCode") == 0:
                 ordem_id = resposta['result'].get('orderId')
                 logger.info(f"[Bybit] Ordem enviada com sucesso. ID: {ordem_id}")
                 return resposta
