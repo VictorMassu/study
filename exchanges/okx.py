@@ -65,15 +65,23 @@ class OKXExchange(ExchangeBase):
         return headers
 
     def formatar_par(self, par):
-        return par.replace("/", "-").upper()  # Ex: usdc/btc → USDC-BTC
+        # Detecta o sufixo e insere hífen
+        for sufixo in ["USDC", "USDT", "BRL", "EUR"]:
+            if par.endswith(sufixo):
+                return par.replace(sufixo, f"-{sufixo}")
+        return par  # fallbac
 
     def obter_preco(self, par):
         symbol = self.formatar_par(par)
-        endpoint = f"/api/v5/market/ticker?instId={symbol}"
+        endpoint = "/api/v5/market/ticker"
         url = self.base_url + endpoint
+        params = {
+            "instType": "SPOT",  # <-- aqui está o ajuste
+            "instId": symbol
+        }
         headers = self._auth_headers("GET", endpoint)
 
-        data = safe_request("GET", url, headers=headers)
+        data = safe_request("GET", url, headers=headers, params=params)
 
         if not data or "data" not in data or len(data["data"]) == 0:
             logger.warning(f"[OKX] Erro ao obter preço para {symbol}")
@@ -87,6 +95,7 @@ class OKXExchange(ExchangeBase):
         except Exception as e:
             logger.error(f"[OKX] Erro ao processar preço para {symbol}: {e}")
             return None, None
+
 
     def verificar_saldo(self, moeda):
         endpoint = "/api/v5/account/balance"
@@ -130,3 +139,19 @@ class OKXExchange(ExchangeBase):
         else:
             logger.error(f"[OKX] Erro ao enviar ordem: {resposta}")
             return None
+        
+    def listar_pares_spot(self):
+        endpoint = "/api/v5/public/instruments"
+        url = self.base_url + endpoint
+        params = {"instType": "SPOT"}
+        headers = self._auth_headers("GET", endpoint)
+
+        data = safe_request("GET", url, headers=headers, params=params)
+
+        if not data or "data" not in data:
+            logger.warning("[OKX] Falha ao obter a lista de pares SPOT.")
+            return []
+
+        pares = [item["instId"] for item in data["data"] if item.get("instId", "").endswith("USDC")]
+        logger.info(f"[OKX] Total de pares SPOT com USDC: {len(pares)}")
+        return pares

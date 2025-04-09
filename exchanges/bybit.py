@@ -47,10 +47,21 @@ class BybitExchange(ExchangeBase):
             return None, None
 
         resultado = data['result']['list'][0]
-        preco_compra = float(resultado['bid1Price'])
-        preco_venda = float(resultado['ask1Price'])
-        logger.info(f"[Bybit] {par} - Compra: {preco_compra}, Venda: {preco_venda}")
-        return preco_compra, preco_venda
+        bid_price = resultado.get('bid1Price', '')
+        ask_price = resultado.get('ask1Price', '')
+
+        if not bid_price or not ask_price:
+            logger.warning(f"[Bybit] Preços vazios para {par}, ignorando...")
+            return None, None
+
+        try:
+            preco_compra = float(bid_price)
+            preco_venda = float(ask_price)
+            logger.info(f"[Bybit] {par} - Compra: {preco_compra}, Venda: {preco_venda}")
+            return preco_compra, preco_venda
+        except Exception as e:
+            logger.error(f"[Bybit] Erro ao converter preços para {par}: {e}")
+            return None, None
 
     def verificar_saldo(self, moeda):
         try:
